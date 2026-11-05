@@ -1,0 +1,1078 @@
+```html
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BDIX Live IPTV Player - বাংলাদেশ লাইভ টিভি</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- HLS.js for m3u8 video streaming support -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              dark: '#0f172a',
+              card: '#1e293b',
+              focus: '#f59e0b'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+    
+    body {
+      font-family: 'Hind Siliguri', sans-serif;
+      background-color: #0b0f19;
+      color: #f8fafc;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow-x: hidden;
+    }
+
+    /* Smart TV D-Pad Focus Styles */
+    .focusable {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+    }
+
+    .focusable:focus, .focusable.tv-focused {
+      outline: 3px solid #6366f1 !important;
+      outline-offset: 3px !important;
+      box-shadow: 0 0 25px rgba(99, 102, 241, 0.6) !important;
+      transform: scale(1.04);
+      z-index: 30;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Aspect ratio fallback */
+    .aspect-video {
+      aspect-ratio: 16 / 9;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col bg-slate-950 text-slate-100">
+
+  <!-- TOP BAR / HEADER -->
+  <header class="h-16 border-b border-slate-800 bg-slate-900/90 backdrop-blur px-4 flex items-center justify-between z-20 shrink-0">
+    <div class="flex items-center space-x-3">
+      <button id="mobileMenuBtn" class="md:hidden p-2 text-slate-300 hover:text-white rounded-lg focusable" tabindex="1">
+        <i class="fa-solid fa-bars text-xl"></i>
+      </button>
+      <div class="flex items-center space-x-2">
+        <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-500/30">
+          <i class="fa-solid fa-tv"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold leading-tight bg-gradient-to-r from-indigo-400 to-pink-500 bg-clip-text text-transparent">
+            BDIX IPTV Live
+          </h1>
+          <p class="text-[10px] text-slate-400 hidden sm:block">স্মার্ট টিভি এবং মোবাইলের জন্য নিখুঁত আইপিটিভি</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search Input -->
+    <div class="flex-1 max-w-md mx-4">
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+        <input 
+          type="text" 
+          id="searchInput" 
+          placeholder="চ্যানেল খুঁজুন (Search channels)..." 
+          class="w-full bg-slate-800 border border-slate-700 text-sm rounded-full pl-9 pr-8 py-1.5 focus:bg-slate-900 focus:outline-none focus:border-indigo-500 focusable text-slate-200 placeholder-slate-400"
+          tabindex="2"
+        />
+        <button id="clearSearch" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+          <i class="fa-solid fa-circle-xmark"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex items-center space-x-2">
+      <!-- M3U Playlist Settings Modal Button -->
+      <button id="openPlaylistModal" class="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-200 text-sm flex items-center space-x-2 focusable" tabindex="3" title="প্লেলিস্ট সেটিংস">
+        <i class="fa-solid fa-link text-indigo-400"></i>
+        <span class="hidden md:inline font-medium">প্লেলিস্ট ইউআরএল</span>
+      </button>
+
+      <button id="tvRemoteGuideBtn" class="p-2 bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700/50 rounded-lg text-indigo-300 text-sm flex items-center space-x-1 focusable" tabindex="4" title="টিভি রিমোট গাইড">
+        <i class="fa-solid fa-gamepad"></i>
+        <span class="hidden md:inline font-medium">রিমোট কন্ট্রোল</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- LEFT SIDEBAR: CATEGORIES & FAVS -->
+    <aside id="sidebar" class="absolute md:relative inset-y-0 left-0 w-64 bg-slate-900/95 border-r border-slate-800 z-30 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col shrink-0">
+      <div class="p-3 border-b border-slate-800 flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">ক্যাটাগরি সমূহ</span>
+        <button id="closeSidebar" class="md:hidden text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Categories Navigation List -->
+      <nav id="categoryList" class="flex-1 overflow-y-auto p-2 space-y-1">
+        <!-- Dynamic Categories Load Here -->
+        <div class="animate-pulse space-y-2 p-2">
+          <div class="h-8 bg-slate-800 rounded-lg"></div>
+          <div class="h-8 bg-slate-800 rounded-lg"></div>
+          <div class="h-8 bg-slate-800 rounded-lg"></div>
+        </div>
+      </nav>
+
+      <!-- Stats Footer -->
+      <div class="p-3 border-t border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+        <span>মোট চ্যানেল: <strong id="totalChannelsCount" class="text-indigo-400">0</strong></span>
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse"></span> BDIX
+        </span>
+      </div>
+    </aside>
+
+    <!-- CONTENT AREA: PLAYER & CHANNEL GRID -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-950">
+      
+      <!-- VIDEO PLAYER CONTAINER -->
+      <div id="playerSection" class="relative bg-black w-full flex-shrink-0 border-b border-slate-800 shadow-2xl transition-all duration-300" style="height: 45vh; min-height: 240px; max-height: 600px;">
+        <video id="videoPlayer" class="w-full h-full object-contain" playsinline crossorigin="anonymous"></video>
+
+        <!-- Player Overlay Controls / Info -->
+        <div id="playerOverlay" class="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/60 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-4 pointer-events-none focusable">
+          
+          <!-- Top Info Bar inside Player -->
+          <div class="flex items-center justify-between pointer-events-auto">
+            <div class="flex items-center space-x-3">
+              <img id="playerChannelLogo" src="" alt="" class="w-10 h-10 object-contain rounded bg-slate-900 border border-slate-700 hidden" onerror="this.classList.add('hidden')">
+              <div>
+                <h2 id="playerChannelTitle" class="text-base sm:text-lg font-bold text-white drop-shadow">একটি চ্যানেল নির্বাচন করুন</h2>
+                <span id="playerChannelGroup" class="text-xs px-2 py-0.5 bg-indigo-600/80 text-indigo-100 rounded-full font-medium">BDIX TV</span>
+              </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+              <button id="favCurrentBtn" class="p-2 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-yellow-400 focusable" title="প্রিয় তালিকায় যোগ করুন">
+                <i class="fa-regular fa-star text-base"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Center Play Status / Loading Spinner -->
+          <div id="playerStateOverlay" class="self-center flex flex-col items-center justify-center space-y-2 pointer-events-auto">
+            <div id="playerSpinner" class="hidden">
+              <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-500"></i>
+            </div>
+            <div id="playerErrorBox" class="hidden text-center bg-red-950/90 border border-red-700/80 p-4 rounded-xl max-w-sm">
+              <i class="fa-solid fa-triangle-exclamation text-2xl text-red-400 mb-2"></i>
+              <p id="playerErrorMessage" class="text-xs text-red-200 mb-3">স্ট্রিমটি প্লে করা যাচ্ছে না। (Stream offline or CORS issue)</p>
+              <button id="retryStreamBtn" class="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-semibold focusable">
+                <i class="fa-solid fa-rotate-right mr-1"></i> পুনরায় চেষ্টা করুন
+              </button>
+            </div>
+          </div>
+
+          <!-- Bottom Controls Bar -->
+          <div class="flex items-center justify-between pointer-events-auto bg-slate-950/80 backdrop-blur rounded-xl p-2 border border-slate-800/80">
+            <div class="flex items-center space-x-2 sm:space-x-4">
+              <button id="playPauseBtn" class="p-2 w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg focusable">
+                <i class="fa-solid fa-play"></i>
+              </button>
+              <button id="muteBtn" class="p-2 text-slate-300 hover:text-white focusable">
+                <i class="fa-solid fa-volume-high"></i>
+              </button>
+              <input id="volumeSlider" type="range" min="0" max="1" step="0.05" value="1" class="w-16 sm:w-24 accent-indigo-500 cursor-pointer focusable">
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <button id="prevChannelBtn" class="p-2 text-slate-300 hover:text-white rounded focusable" title="আগের চ্যানেল (PageUp)">
+                <i class="fa-solid fa-backward-step"></i>
+              </button>
+              <button id="nextChannelBtn" class="p-2 text-slate-300 hover:text-white rounded focusable" title="পরের চ্যানেল (PageDown)">
+                <i class="fa-solid fa-forward-step"></i>
+              </button>
+              <button id="fullscreenBtn" class="p-2 text-slate-300 hover:text-white rounded focusable" title="ফুলস্ক্রিন">
+                <i class="fa-solid fa-expand"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHANNELS LIST SECTION HEADER -->
+      <div class="px-4 py-2.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
+        <div class="flex items-center space-x-2">
+          <h3 id="currentCategoryTitle" class="text-sm font-bold text-slate-200">সকল চ্যানেল</h3>
+          <span id="categoryCountBadge" class="px-2 py-0.5 text-xs bg-slate-800 text-slate-400 rounded-full font-semibold">0</span>
+        </div>
+
+        <!-- View Mode Switches -->
+        <div class="flex items-center space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+          <button id="viewGridBtn" class="px-2.5 py-1 rounded text-xs text-indigo-400 bg-slate-800 font-medium focusable">
+            <i class="fa-solid fa-border-all"></i> <span class="hidden sm:inline">গ্রিড</span>
+          </button>
+          <button id="viewListBtn" class="px-2.5 py-1 rounded text-xs text-slate-400 hover:text-slate-200 font-medium focusable">
+            <i class="fa-solid fa-list"></i> <span class="hidden sm:inline">লিস্ট</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- CHANNELS GRID / LIST DISPLAY CONTAINER -->
+      <div class="flex-1 overflow-y-auto p-3 sm:p-4" id="channelsScrollArea">
+        <div id="channelsContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 sm:gap-4">
+          <!-- Skeleton Loading States -->
+          <div class="animate-pulse bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col items-center h-32">
+            <div class="w-12 h-12 bg-slate-800 rounded-full mb-2"></div>
+            <div class="w-3/4 h-3 bg-slate-800 rounded mb-1"></div>
+            <div class="w-1/2 h-2 bg-slate-800 rounded"></div>
+          </div>
+        </div>
+
+        <!-- Empty State Message -->
+        <div id="emptyState" class="hidden flex flex-col items-center justify-center py-16 text-center text-slate-500">
+          <i class="fa-solid fa-tv text-5xl mb-3 text-slate-700"></i>
+          <p class="text-base font-semibold text-slate-400">কোন চ্যানেল পাওয়া যায়নি!</p>
+          <p class="text-xs text-slate-600 mt-1">অন্য ক্যাটাগরি বা সার্চ দিয়ে ট্রাই করুন</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL 1: PLAYLIST CONFIGURATION MODAL -->
+  <div id="playlistModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+      <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+        <h3 class="font-bold text-slate-100 flex items-center space-x-2">
+          <i class="fa-solid fa-list-check text-indigo-400"></i>
+          <span>আইপিটিভি প্লেলিস্ট সেটিংস</span>
+        </h3>
+        <button id="closePlaylistModal" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-4 text-sm">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">M3U / M3U8 Playlist URL (লিংক)</label>
+          <input 
+            type="url" 
+            id="m3uUrlInput" 
+            value="https://raw.githubusercontent.com/abusaeeidx/Mrgify-BDIX-IPTV/refs/heads/main/playlist.m3u"
+            class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 font-mono text-xs focusable"
+          >
+        </div>
+
+        <div class="flex items-center text-xs text-slate-500 my-2">
+          <div class="flex-1 border-t border-slate-800"></div>
+          <span class="px-3">অথবা ফাইল আপলোড করুন</span>
+          <div class="flex-1 border-t border-slate-800"></div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">লোকাল .m3u / .m3u8 ফাইল সিলেক্ট করুন</label>
+          <input 
+            type="file" 
+            id="m3uFileInput" 
+            accept=".m3u,.m3u8"
+            class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer"
+          >
+        </div>
+      </div>
+      <div class="p-4 bg-slate-950 border-t border-slate-800 flex justify-end space-x-2">
+        <button id="cancelPlaylistBtn" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white text-xs font-semibold focusable">বাতিল</button>
+        <button id="loadPlaylistBtn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-lg shadow-indigo-600/30 focusable">
+          <i class="fa-solid fa-download mr-1.5"></i> লোড করুন
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: SMART TV REMOTE GUIDE -->
+  <div id="remoteGuideModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+        <h3 class="font-bold text-slate-100 flex items-center space-x-2">
+          <i class="fa-solid fa-gamepad text-indigo-400"></i>
+          <span>স্মার্ট টিভি রিমোট নেভিগেশন গাইড</span>
+        </h3>
+        <button id="closeRemoteGuideModal" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3 text-xs text-slate-300">
+        <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+          <span>arrow keys (<i class="fa-solid fa-arrows-up-down-left-right"></i>)</span>
+          <span class="text-indigo-400 font-medium">চ্যানেল / বাটন নেভিগেট করুন</span>
+        </div>
+        <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+          <span>Enter / OK</span>
+          <span class="text-indigo-400 font-medium">চ্যানেল প্লে করুন বা অ্যাকশন সিলেক্ট করুন</span>
+        </div>
+        <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+          <span>Escape / Backspace</span>
+          <span class="text-indigo-400 font-medium">প্লেয়ার মোড বন্ধ বা ব্যাক করুন</span>
+        </div>
+        <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+          <span>PageUp / PageDown</span>
+          <span class="text-indigo-400 font-medium">পরবর্তী / পূর্ববর্তী চ্যানেল পরিবর্তন</span>
+        </div>
+        <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+          <span>Spacebar</span>
+          <span class="text-indigo-400 font-medium">প্লে / পজ টগল</span>
+        </div>
+      </div>
+      <div class="p-4 bg-slate-950 border-t border-slate-800 text-center">
+        <button id="understoodRemoteBtn" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold focusable">
+          বুঝেছি (Got it)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC ENGINE -->
+  <script>
+    /**
+     * IPTV Application State Management
+     */
+    const DEFAULT_PLAYLIST_URL = 'https://raw.githubusercontent.com/abusaeeidx/Mrgify-BDIX-IPTV/refs/heads/main/playlist.m3u';
+
+    const state = {
+      channels: [],
+      categories: new Set(),
+      currentCategory: 'ALL',
+      favorites: new Set(JSON.parse(localStorage.getItem('iptv_favs') || '[]')),
+      currentChannel: null,
+      searchQuery: '',
+      viewMode: 'grid', // 'grid' | 'list'
+      hls: null,
+      tvFocusIndex: -1
+    };
+
+    // DOM Elements Cache
+    const elements = {
+      videoPlayer: document.getElementById('videoPlayer'),
+      channelsContainer: document.getElementById('channelsContainer'),
+      categoryList: document.getElementById('categoryList'),
+      searchInput: document.getElementById('searchInput'),
+      clearSearch: document.getElementById('clearSearch'),
+      totalChannelsCount: document.getElementById('totalChannelsCount'),
+      currentCategoryTitle: document.getElementById('currentCategoryTitle'),
+      categoryCountBadge: document.getElementById('categoryCountBadge'),
+      emptyState: document.getElementById('emptyState'),
+      
+      // Player UI
+      playerChannelTitle: document.getElementById('playerChannelTitle'),
+      playerChannelGroup: document.getElementById('playerChannelGroup'),
+      playerChannelLogo: document.getElementById('playerChannelLogo'),
+      playerSpinner: document.getElementById('playerSpinner'),
+      playerErrorBox: document.getElementById('playerErrorBox'),
+      playerErrorMessage: document.getElementById('playerErrorMessage'),
+      playPauseBtn: document.getElementById('playPauseBtn'),
+      muteBtn: document.getElementById('muteBtn'),
+      volumeSlider: document.getElementById('volumeSlider'),
+      fullscreenBtn: document.getElementById('fullscreenBtn'),
+      favCurrentBtn: document.getElementById('favCurrentBtn'),
+      prevChannelBtn: document.getElementById('prevChannelBtn'),
+      nextChannelBtn: document.getElementById('nextChannelBtn'),
+      retryStreamBtn: document.getElementById('retryStreamBtn'),
+
+      // Sidebar & Layout
+      mobileMenuBtn: document.getElementById('mobileMenuBtn'),
+      closeSidebar: document.getElementById('closeSidebar'),
+      sidebar: document.getElementById('sidebar'),
+      viewGridBtn: document.getElementById('viewGridBtn'),
+      viewListBtn: document.getElementById('viewListBtn'),
+
+      // Modals
+      playlistModal: document.getElementById('playlistModal'),
+      openPlaylistModal: document.getElementById('openPlaylistModal'),
+      closePlaylistModal: document.getElementById('closePlaylistModal'),
+      cancelPlaylistBtn: document.getElementById('cancelPlaylistBtn'),
+      loadPlaylistBtn: document.getElementById('loadPlaylistBtn'),
+      m3uUrlInput: document.getElementById('m3uUrlInput'),
+      m3uFileInput: document.getElementById('m3uFileInput'),
+
+      remoteGuideModal: document.getElementById('remoteGuideModal'),
+      tvRemoteGuideBtn: document.getElementById('tvRemoteGuideBtn'),
+      closeRemoteGuideModal: document.getElementById('closeRemoteGuideModal'),
+      understoodRemoteBtn: document.getElementById('understoodRemoteBtn')
+    };
+
+    /**
+     * App Initialization
+     */
+    window.addEventListener('DOMContentLoaded', () => {
+      initHls();
+      bindEvents();
+      setupDpadNavigation();
+      loadPlaylistFromUrl(DEFAULT_PLAYLIST_URL);
+    });
+
+    /**
+     * Initialize HLS Player Engine
+     */
+    function initHls() {
+      if (Hls.isSupported()) {
+        state.hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 90
+        });
+
+        state.hls.on(Hls.Events.ERROR, (event, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                showPlayerError('নেটওয়ার্ক সমস্যা বা লিংক অফলাইন!');
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                state.hls.recoverMediaError();
+                break;
+              default:
+                showPlayerError('স্ট্রিম প্লে করা সম্ভব হচ্ছে না!');
+                break;
+            }
+          }
+        });
+      }
+    }
+
+    /**
+     * M3U Playlist Parser Engine
+     */
+    async function loadPlaylistFromUrl(url) {
+      showLoadingGrid();
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Playlist fetch failed');
+        const m3uText = await response.text();
+        parseM3UContent(m3uText);
+      } catch (err) {
+        console.error('Error fetching playlist:', err);
+        // Fallback or retry prompt
+        elements.channelsContainer.innerHTML = `
+          <div class="col-span-full text-center py-12">
+            <p class="text-red-400 font-semibold mb-2">প্লেলিস্ট লোড করতে সমস্যা হয়েছে!</p>
+            <p class="text-xs text-slate-500 mb-4">CORS বা ইন্টারনেট কানেকশন চেক করুন</p>
+            <button onclick="loadPlaylistFromUrl('${url}')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg">
+              আবার চেষ্টা করুন
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    function parseM3UContent(content) {
+      const lines = content.split('\n');
+      const channels = [];
+      const categories = new Set();
+      
+      let currentItem = null;
+
+      lines.forEach((line) => {
+        line = line.trim();
+        if (line.startsWith('#EXTINF:')) {
+          currentItem = {};
+          
+          // Parse Logo
+          const logoMatch = line.match(/tvg-logo="([^"]*)"/);
+          currentItem.logo = logoMatch ? logoMatch[1] : '';
+
+          // Parse Group / Category
+          const groupMatch = line.match(/group-title="([^"]*)"/);
+          currentItem.group = groupMatch ? groupMatch[1].trim() : 'অন্যান্য (Others)';
+
+          // Parse Channel Title
+          const titleParts = line.split(',');
+          currentItem.title = titleParts[titleParts.length - 1].trim() || 'অজানা চ্যানেল';
+
+        } else if (line && !line.startsWith('#')) {
+          if (currentItem) {
+            currentItem.url = line;
+            currentItem.id = 'ch_' + Math.random().toString(36).substr(2, 9);
+            channels.push(currentItem);
+            categories.add(currentItem.group);
+            currentItem = null;
+          }
+        }
+      });
+
+      state.channels = channels;
+      state.categories = categories;
+
+      renderCategories();
+      renderChannels();
+
+      // Automatically play first available channel
+      if (channels.length > 0) {
+        playChannel(channels[0]);
+      }
+    }
+
+    /**
+     * Render UI Components
+     */
+    function renderCategories() {
+      elements.totalChannelsCount.textContent = state.channels.length;
+      
+      let html = `
+        <button data-cat="ALL" class="cat-btn w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors focusable ${state.currentCategory === 'ALL' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'}" tabindex="10">
+          <span><i class="fa-solid fa-list-ul mr-2 text-indigo-400"></i> সকল চ্যানেল</span>
+          <span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded text-[10px]">${state.channels.length}</span>
+        </button>
+
+        <button data-cat="FAV" class="cat-btn w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors focusable ${state.currentCategory === 'FAV' ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'}" tabindex="11">
+          <span><i class="fa-solid fa-star mr-2 text-amber-400"></i> প্রিয় তালিকা</span>
+          <span class="bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded text-[10px]">${state.favorites.size}</span>
+        </button>
+      `;
+
+      Array.from(state.categories).sort().forEach((cat, index) => {
+        const count = state.channels.filter(c => c.group === cat).length;
+        const isActive = state.currentCategory === cat;
+        html += `
+          <button data-cat="${cat}" class="cat-btn w-full text-left px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-colors focusable ${isActive ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'}" tabindex="${12 + index}">
+            <span class="truncate"><i class="fa-solid fa-tv mr-2 text-slate-500"></i> ${cat}</span>
+            <span class="bg-slate-950/60 text-slate-400 px-1.5 py-0.5 rounded text-[10px] ml-1">${count}</span>
+          </button>
+        `;
+      });
+
+      elements.categoryList.innerHTML = html;
+
+      // Add Category Click Listener
+      document.querySelectorAll('.cat-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const category = btn.getAttribute('data-cat');
+          selectCategory(category);
+          // Close mobile drawer on choice
+          elements.sidebar.classList.add('-translate-x-full');
+        });
+      });
+    }
+
+    function selectCategory(category) {
+      state.currentCategory = category;
+      elements.currentCategoryTitle.textContent = category === 'ALL' ? 'সকল চ্যানেল' : (category === 'FAV' ? 'প্রিয় চ্যানেল তালিকা' : category);
+      renderCategories();
+      renderChannels();
+    }
+
+    function getFilteredChannels() {
+      return state.channels.filter(ch => {
+        const matchesCat = state.currentCategory === 'ALL' ? true :
+                           state.currentCategory === 'FAV' ? state.favorites.has(ch.id) :
+                           ch.group === state.currentCategory;
+        
+        const matchesSearch = ch.title.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
+                              ch.group.toLowerCase().includes(state.searchQuery.toLowerCase());
+
+        return matchesCat && matchesSearch;
+      });
+    }
+
+    function renderChannels() {
+      const list = getFilteredChannels();
+      elements.categoryCountBadge.textContent = list.length;
+
+      if (list.length === 0) {
+        elements.channelsContainer.innerHTML = '';
+        elements.emptyState.classList.remove('hidden');
+        return;
+      }
+
+      elements.emptyState.classList.add('hidden');
+
+      if (state.viewMode === 'grid') {
+        elements.channelsContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 sm:gap-4';
+      } else {
+        elements.channelsContainer.className = 'flex flex-col space-y-2';
+      }
+
+      let html = '';
+      list.forEach((ch, index) => {
+        const isPlaying = state.currentChannel && state.currentChannel.id === ch.id;
+        const isFav = state.favorites.has(ch.id);
+
+        if (state.viewMode === 'grid') {
+          html += `
+            <div 
+              data-id="${ch.id}" 
+              class="channel-card focusable bg-slate-900 hover:bg-slate-800 border ${isPlaying ? 'border-indigo-500 shadow-lg shadow-indigo-600/20 bg-indigo-950/30' : 'border-slate-800'} rounded-xl p-3 flex flex-col items-center justify-between cursor-pointer relative group transition-all"
+              tabindex="${100 + index}"
+            >
+              <button data-favid="${ch.id}" class="fav-btn absolute top-2 right-2 p-1.5 text-slate-500 hover:text-amber-400 focus:outline-none z-10">
+                <i class="${isFav ? 'fa-solid fa-star text-amber-400' : 'fa-regular fa-star'}"></i>
+              </button>
+
+              <div class="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center my-2 relative">
+                ${ch.logo ? 
+                  `<img src="${ch.logo}" alt="${ch.title}" class="max-w-full max-h-full object-contain rounded" onerror="this.onerror=null; this.src='https://placehold.co/100x100/1e293b/94a3b8?text=TV';">` :
+                  `<div class="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-400"><i class="fa-solid fa-tv text-xl"></i></div>`
+                }
+              </div>
+
+              <div class="w-full text-center">
+                <p class="text-xs font-bold text-slate-100 truncate ${isPlaying ? 'text-indigo-400' : ''}">${ch.title}</p>
+                <p class="text-[10px] text-slate-500 truncate mt-0.5">${ch.group}</p>
+              </div>
+
+              ${isPlaying ? `<div class="absolute bottom-1 right-2 flex space-x-0.5"><span class="w-1 h-2 bg-indigo-500 animate-pulse"></span><span class="w-1 h-3 bg-indigo-500 animate-pulse delay-75"></span></div>` : ''}
+            </div>
+          `;
+        } else {
+          // List View
+          html += `
+            <div 
+              data-id="${ch.id}" 
+              class="channel-card focusable bg-slate-900 hover:bg-slate-800 border ${isPlaying ? 'border-indigo-500 bg-indigo-950/30' : 'border-slate-800'} rounded-xl p-2.5 flex items-center justify-between cursor-pointer transition-all"
+              tabindex="${100 + index}"
+            >
+              <div class="flex items-center space-x-3 truncate">
+                <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-slate-950 rounded-lg p-1 border border-slate-800">
+                  ${ch.logo ? 
+                    `<img src="${ch.logo}" alt="" class="max-w-full max-h-full object-contain" onerror="this.src='https://placehold.co/60x60/1e293b/94a3b8?text=TV'">` :
+                    `<i class="fa-solid fa-tv text-slate-500"></i>`
+                  }
+                </div>
+                <div class="truncate">
+                  <p class="text-xs font-bold text-slate-200 truncate ${isPlaying ? 'text-indigo-400' : ''}">${ch.title}</p>
+                  <p class="text-[10px] text-slate-500">${ch.group}</p>
+                </div>
+              </div>
+
+              <div class="flex items-center space-x-3">
+                <button data-favid="${ch.id}" class="fav-btn p-2 text-slate-400 hover:text-amber-400">
+                  <i class="${isFav ? 'fa-solid fa-star text-amber-400' : 'fa-regular fa-star'}"></i>
+                </button>
+                <i class="fa-solid fa-play text-xs text-indigo-500"></i>
+              </div>
+            </div>
+          `;
+        }
+      });
+
+      elements.channelsContainer.innerHTML = html;
+
+      // Channel Click listeners
+      document.querySelectorAll('.channel-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.fav-btn')) return; // handled separately
+          const id = card.getAttribute('data-id');
+          const channel = state.channels.find(c => c.id === id);
+          if (channel) playChannel(channel);
+        });
+      });
+
+      // Favorite toggle click
+      document.querySelectorAll('.fav-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.getAttribute('data-favid');
+          toggleFavorite(id);
+        });
+      });
+    }
+
+    /**
+     * Video Stream Control Logic
+     */
+    function playChannel(channel) {
+      state.currentChannel = channel;
+      
+      // Update Player Metadata Header
+      elements.playerChannelTitle.textContent = channel.title;
+      elements.playerChannelGroup.textContent = channel.group;
+
+      if (channel.logo) {
+        elements.playerChannelLogo.src = channel.logo;
+        elements.playerChannelLogo.classList.remove('hidden');
+      } else {
+        elements.playerChannelLogo.classList.add('hidden');
+      }
+
+      updateFavStatusIcon();
+      showPlayerSpinner(true);
+      hidePlayerError();
+
+      const video = elements.videoPlayer;
+
+      if (Hls.isSupported() && channel.url.includes('.m3u8')) {
+        state.hls.stopLoad();
+        state.hls.loadSource(channel.url);
+        state.hls.attachMedia(video);
+        state.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => {});
+          showPlayerSpinner(false);
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl') || channel.url.endsWith('.mp4')) {
+        // Native Safari/iOS support
+        video.src = channel.url;
+        video.addEventListener('loadedmetadata', () => {
+          video.play().catch(() => {});
+          showPlayerSpinner(false);
+        });
+      } else {
+        // Direct stream attempt fallback
+        video.src = channel.url;
+        video.play().catch((err) => {
+          console.warn('Native play failed:', err);
+          showPlayerError('ভিডিও স্ট্রিমটি চালু করা যায়নি।');
+        });
+      }
+
+      renderChannels(); // Refresh playing highlighted card state
+    }
+
+    function toggleFavorite(id) {
+      if (state.favorites.has(id)) {
+        state.favorites.delete(id);
+      } else {
+        state.favorites.add(id);
+      }
+      localStorage.setItem('iptv_favs', JSON.stringify(Array.from(state.favorites)));
+      renderCategories();
+      renderChannels();
+      updateFavStatusIcon();
+    }
+
+    function updateFavStatusIcon() {
+      if (!state.currentChannel) return;
+      const isFav = state.favorites.has(state.currentChannel.id);
+      const icon = elements.favCurrentBtn.querySelector('i');
+      if (isFav) {
+        icon.className = 'fa-solid fa-star text-amber-400';
+      } else {
+        icon.className = 'fa-regular fa-star text-slate-300';
+      }
+    }
+
+    function showPlayerSpinner(show) {
+      if (show) {
+        elements.playerSpinner.classList.remove('hidden');
+      } else {
+        elements.playerSpinner.classList.add('hidden');
+      }
+    }
+
+    function showPlayerError(msg) {
+      showPlayerSpinner(false);
+      elements.playerErrorMessage.textContent = msg;
+      elements.playerErrorBox.classList.remove('hidden');
+    }
+
+    function hidePlayerError() {
+      elements.playerErrorBox.classList.add('hidden');
+    }
+
+    function showLoadingGrid() {
+      elements.channelsContainer.innerHTML = Array(12).fill(0).map(() => `
+        <div class="animate-pulse bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col items-center h-32">
+          <div class="w-12 h-12 bg-slate-800 rounded-full mb-2"></div>
+          <div class="w-3/4 h-3 bg-slate-800 rounded mb-1"></div>
+          <div class="w-1/2 h-2 bg-slate-800 rounded"></div>
+        </div>
+      `).join('');
+    }
+
+    /**
+     * Event Listeners & Player Controls Bindings
+     */
+    function bindEvents() {
+      // Mobile Drawer Toggle
+      elements.mobileMenuBtn.addEventListener('click', () => {
+        elements.sidebar.classList.remove('-translate-x-full');
+      });
+
+      elements.closeSidebar.addEventListener('click', () => {
+        elements.sidebar.classList.add('-translate-x-full');
+      });
+
+      // Search functionality
+      elements.searchInput.addEventListener('input', (e) => {
+        state.searchQuery = e.target.value;
+        if (state.searchQuery) {
+          elements.clearSearch.classList.remove('hidden');
+        } else {
+          elements.clearSearch.classList.add('hidden');
+        }
+        renderChannels();
+      });
+
+      elements.clearSearch.addEventListener('click', () => {
+        elements.searchInput.value = '';
+        state.searchQuery = '';
+        elements.clearSearch.classList.add('hidden');
+        renderChannels();
+      });
+
+      // View Mode Toggles
+      elements.viewGridBtn.addEventListener('click', () => {
+        state.viewMode = 'grid';
+        elements.viewGridBtn.className = 'px-2.5 py-1 rounded text-xs text-indigo-400 bg-slate-800 font-medium focusable';
+        elements.viewListBtn.className = 'px-2.5 py-1 rounded text-xs text-slate-400 hover:text-slate-200 font-medium focusable';
+        renderChannels();
+      });
+
+      elements.viewListBtn.addEventListener('click', () => {
+        state.viewMode = 'list';
+        elements.viewListBtn.className = 'px-2.5 py-1 rounded text-xs text-indigo-400 bg-slate-800 font-medium focusable';
+        elements.viewGridBtn.className = 'px-2.5 py-1 rounded text-xs text-slate-400 hover:text-slate-200 font-medium focusable';
+        renderChannels();
+      });
+
+      // Play / Pause
+      elements.playPauseBtn.addEventListener('click', () => {
+        const v = elements.videoPlayer;
+        if (v.paused) {
+          v.play();
+          elements.playPauseBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        } else {
+          v.pause();
+          elements.playPauseBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+        }
+      });
+
+      elements.videoPlayer.addEventListener('play', () => {
+        elements.playPauseBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+        showPlayerSpinner(false);
+      });
+
+      elements.videoPlayer.addEventListener('pause', () => {
+        elements.playPauseBtn.innerHTML = '<i class="fa-solid fa-play"></i>';
+      });
+
+      elements.videoPlayer.addEventListener('waiting', () => showPlayerSpinner(true));
+      elements.videoPlayer.addEventListener('playing', () => showPlayerSpinner(false));
+
+      // Mute / Volume
+      elements.muteBtn.addEventListener('click', () => {
+        elements.videoPlayer.muted = !elements.videoPlayer.muted;
+        elements.muteBtn.innerHTML = elements.videoPlayer.muted ? 
+          '<i class="fa-solid fa-volume-xmark text-red-400"></i>' : 
+          '<i class="fa-solid fa-volume-high"></i>';
+      });
+
+      elements.volumeSlider.addEventListener('input', (e) => {
+        elements.videoPlayer.volume = e.target.value;
+        elements.videoPlayer.muted = (e.target.value == 0);
+      });
+
+      // Fullscreen
+      elements.fullscreenBtn.addEventListener('click', () => {
+        const container = document.getElementById('playerSection');
+        if (!document.fullscreenElement) {
+          container.requestFullscreen().catch(err => alert("Fullscreen error"));
+        } else {
+          document.exitFullscreen();
+        }
+      });
+
+      // Favorite Current Playing
+      elements.favCurrentBtn.addEventListener('click', () => {
+        if (state.currentChannel) toggleFavorite(state.currentChannel.id);
+      });
+
+      // Retry Stream Button
+      elements.retryStreamBtn.addEventListener('click', () => {
+        if (state.currentChannel) playChannel(state.currentChannel);
+      });
+
+      // Channel Swapping (Next / Prev)
+      elements.prevChannelBtn.addEventListener('click', playPrevChannel);
+      elements.nextChannelBtn.addEventListener('click', playNextChannel);
+
+      // Modal Open/Close Event Bindings
+      elements.openPlaylistModal.addEventListener('click', () => elements.playlistModal.classList.remove('hidden'));
+      elements.closePlaylistModal.addEventListener('click', () => elements.playlistModal.classList.add('hidden'));
+      elements.cancelPlaylistBtn.addEventListener('click', () => elements.playlistModal.classList.add('hidden'));
+
+      elements.loadPlaylistBtn.addEventListener('click', () => {
+        const url = elements.m3uUrlInput.value.trim();
+        if (url) {
+          loadPlaylistFromUrl(url);
+          elements.playlistModal.classList.add('hidden');
+        }
+      });
+
+      // Local M3U File Upload Reader
+      elements.m3uFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            parseM3UContent(event.target.result);
+            elements.playlistModal.classList.add('hidden');
+          };
+          reader.readAsText(file);
+        }
+      });
+
+      // Remote Guide Modal
+      elements.tvRemoteGuideBtn.addEventListener('click', () => elements.remoteGuideModal.classList.remove('hidden'));
+      elements.closeRemoteGuideModal.addEventListener('click', () => elements.remoteGuideModal.classList.add('hidden'));
+      elements.understoodRemoteBtn.addEventListener('click', () => elements.remoteGuideModal.classList.add('hidden'));
+    }
+
+    function playNextChannel() {
+      const list = getFilteredChannels();
+      if (!list.length) return;
+      let idx = list.findIndex(c => c.id === state.currentChannel?.id);
+      idx = (idx + 1) % list.length;
+      playChannel(list[idx]);
+    }
+
+    function playPrevChannel() {
+      const list = getFilteredChannels();
+      if (!list.length) return;
+      let idx = list.findIndex(c => c.id === state.currentChannel?.id);
+      idx = (idx - 1 + list.length) % list.length;
+      playChannel(list[idx]);
+    }
+
+    /**
+     * Smart TV D-Pad & Keyboard Remote Control Engine
+     */
+    function setupDpadNavigation() {
+      window.addEventListener('keydown', (e) => {
+        const activeElement = document.activeElement;
+        const focusables = Array.from(document.querySelectorAll('.focusable')).filter(el => el.offsetWidth > 0 && el.offsetHeight > 0);
+
+        if (!focusables.length) return;
+
+        let currentIndex = focusables.indexOf(activeElement);
+
+        switch (e.key) {
+          case 'ArrowRight':
+            if (activeElement.tagName === 'INPUT' && activeElement.type === 'text') return;
+            e.preventDefault();
+            if (currentIndex < focusables.length - 1) {
+              focusables[currentIndex + 1].focus();
+            }
+            break;
+
+          case 'ArrowLeft':
+            if (activeElement.tagName === 'INPUT' && activeElement.type === 'text') return;
+            e.preventDefault();
+            if (currentIndex > 0) {
+              focusables[currentIndex - 1].focus();
+            }
+            break;
+
+          case 'ArrowDown':
+            e.preventDefault();
+            navigateGrid('down', focusables, currentIndex);
+            break;
+
+          case 'ArrowUp':
+            e.preventDefault();
+            navigateGrid('up', focusables, currentIndex);
+            break;
+
+          case 'PageDown':
+          case 'ChannelDown':
+            e.preventDefault();
+            playNextChannel();
+            break;
+
+          case 'PageUp':
+          case 'ChannelUp':
+            e.preventDefault();
+            playPrevChannel();
+            break;
+
+          case ' ':
+            if (activeElement.tagName !== 'INPUT') {
+              e.preventDefault();
+              elements.playPauseBtn.click();
+            }
+            break;
+
+          case 'Escape':
+          case 'Backspace':
+          case 'GoBack':
+            if (document.fullscreenElement) {
+              document.exitFullscreen();
+            } else if (!elements.playlistModal.classList.contains('hidden')) {
+              elements.playlistModal.classList.add('hidden');
+            } else if (!elements.remoteGuideModal.classList.contains('hidden')) {
+              elements.remoteGuideModal.classList.add('hidden');
+            }
+            break;
+        }
+      });
+    }
+
+    // Helper to calculate approximate TV D-Pad Grid navigation
+    function navigateGrid(direction, focusables, currentIndex) {
+      if (currentIndex === -1) {
+        focusables[0].focus();
+        return;
+      }
+
+      const currentRect = focusables[currentIndex].getBoundingClientRect();
+      let bestMatch = null;
+      let minDistance = Infinity;
+
+      focusables.forEach((el, idx) => {
+        if (idx === currentIndex) return;
+        const rect = el.getBoundingClientRect();
+
+        let isCandidate = false;
+        if (direction === 'down' && rect.top >= currentRect.bottom - 10) isCandidate = true;
+        if (direction === 'up' && rect.bottom <= currentRect.top + 10) isCandidate = true;
+
+        if (isCandidate) {
+          const dist = Math.hypot(rect.left - currentRect.left, rect.top - currentRect.top);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestMatch = el;
+          }
+        }
+      });
+
+      if (bestMatch) {
+        bestMatch.focus();
+        bestMatch.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+    }
+  </script>
+</body>
+</html>
+```

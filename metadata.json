@@ -1,0 +1,6 @@
+{
+  "name": "BDIX Live IPTV Player",
+  "description": "Smart TV, Mobile and Web live IPTV player for Bangladesh BDIX channels with M3U parser, category filtering, favorites, remote control navigation, and HLS streaming.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
